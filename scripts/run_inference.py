@@ -27,6 +27,7 @@ from hydra.core.hydra_config import HydraConfig
 import numpy as np
 import random
 import glob
+from early_stop import EarlyStopChecker
 
 
 def make_deterministic(seed=0):
@@ -52,6 +53,15 @@ def main(conf: HydraConfig) -> None:
 
     # Initialize sampler and target/contig.
     sampler = iu.sampler_selector(conf)
+
+    # Set up mid-trajectory early stopping (off by default).
+    # Enable with: early_stop.enabled=True on the command line.
+    early_stop_checker = EarlyStopChecker(
+        cfg=conf.early_stop,
+        binderlen=getattr(sampler, 'binderlen', 0),
+        t_step_input=sampler.t_step_input,
+        logger=log,
+    )
 
     # Loop over number of designs to sample.
     design_startnum = sampler.inf_conf.design_startnum
@@ -89,15 +99,27 @@ def main(conf: HydraConfig) -> None:
 
         x_t = torch.clone(x_init)
         seq_t = torch.clone(seq_init)
+        early_stop_checker.reset()
         # Loop over number of reverse diffusion time steps.
+        aborted = False
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
             px0, x_t, seq_t, plddt = sampler.sample_step(
                 t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step
             )
+            if early_stop_checker.step(t, px0):
+                _total_steps = int(sampler.t_step_input) - sampler.inf_conf.final_step + 1
+                _saved_steps = t - sampler.inf_conf.final_step
+                log.info(f'[early_stop] Aborting design {out_prefix} at t={t} '
+                         f'after {int(sampler.t_step_input)-t+1} steps — '
+                         f'saved ~{_saved_steps / _total_steps * 100:.0f}% of compute')
+                aborted = True
+                break
             px0_xyz_stack.append(px0)
             denoised_xyz_stack.append(x_t)
             seq_stack.append(seq_t)
             plddt_stack.append(plddt[0])  # remove singleton leading dimension
+        if aborted:
+            continue
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
