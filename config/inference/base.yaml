@@ -9,38 +9,31 @@ inference:
   recenter: True
   radius: 10.0
   model_only_neighbors: False
-  num_recycles: 1
-  recycle_schedule: null
-  softmax_T: 1e-5
   output_prefix: samples/design
   write_trajectory: True
+  empty_cache_per_design: False
   scaffold_guided: False
-  model_runner: NRBStyleSelfCond
+  model_runner: SelfConditioning
   cautious: True
-  recycle_between: False
   align_motif: True
-  autoregressive_confidence: True
-  no_confidence: True
-  use_jw_selfcond: False
   symmetric_self_cond: True
   final_step: 1
-  feed_true_xt: False
-  annotate_termini: True
   deterministic: False
-  seed: 0
   trb_save_ckpt_path: null
-  run_rf2_at_t: null
+  schedule_directory_path: null
+  model_directory_path: null
+  cyclic: False 
+  cyc_chains: 'a'
 
 contigmap:
   contigs: null
-  inpaint_str: null
   inpaint_seq: null
-  provide_seq: null
-  length: null
+  inpaint_str: null
   inpaint_str_helix: null
   inpaint_str_strand: null
   inpaint_str_loop: null
-  specific_contig_pkl: null
+  provide_seq: null
+  length: null
 
 model:
   n_extra_block: 4
@@ -78,11 +71,8 @@ model:
     l1_in_features: 3
     l1_out_features: 2
     num_edge_features: 64
-  d_time_emb: null
-  d_time_emb_proj: null
   freeze_track_motif: False
   use_motif_timestep: False
-  input_seq_onehot: False
 
 diffuser:
   T: 50
@@ -90,23 +80,13 @@ diffuser:
   b_T: 7e-2
   schedule_type: linear
   so3_type: igso3
-  aa_decode_steps: 40
-  chi_type: wrapped_normal
-  crd_scale: 0.0667
-  schedule_kwargs: {}
+  crd_scale: 0.25
   partial_T: null    
   so3_schedule_type: linear
   min_b: 1.5
   max_b: 2.5
   min_sigma: 0.02
   max_sigma: 1.5
-
-seq_diffuser:
-  s_b0: null
-  s_bT: null
-  schedule_type: null
-  loss_type: null
-  seqdiff: null
 
 denoiser:
   noise_scale_ca: 1
@@ -115,7 +95,6 @@ denoiser:
   noise_scale_frame: 1
   final_noise_scale_frame: 1
   frame_noise_schedule_type: constant
-  noise_scale_torsion: 1
 
 ppi:
   hotspot_res: null
@@ -134,50 +113,18 @@ contig_settings:
   hal_idx: null
   idx_rf: null
   inpaint_seq_tensor: null
-  inpaint_str_tensor: null
 
 preprocess:
   sidechain_input: False
   motif_sidechain_input: True
-  sequence_decode: True
   d_t1d: 22
   d_t2d: 44
   prob_self_cond: 0.0
   str_self_cond: False
-  seq_self_cond: False
   predict_previous: False
   
 logging:
   inputs: False
-
-# Mid-trajectory early stopping.
-# Checks px0 (the model's current prediction of the final structure) every
-# check_every steps and aborts the denoising loop when a failure-mode
-# filter fires.  Set enabled: True to activate.
-early_stop:
-  enabled: False          # master switch; off by default
-  check_every: 5          # run checks every N denoising steps
-  start_after: 10         # skip the first N steps (px0 unreliable at high noise)
-
-  # Single long-helix filter.  A common failure mode for binder design.
-  # Safe for helical-bundle targets (3HB/4HB/5HB) — does NOT trigger on
-  # overall helix content, only on a single run dominating the binder.
-  helix_filter:
-    enabled: True
-    # Abort when the longest contiguous helix run exceeds this fraction
-    # of the total binder length.  A lone helix scores ~1.0; each helix
-    # in a 4HB scores ~0.20-0.25.
-    max_helix_run_frac: 0.60
-    # Abort when a single helix segment contains this fraction of all
-    # helical residues (1.0 = lone helix; ~0.25 = 4HB).  Only evaluated
-    # when overall helix content > helix_content_threshold.
-    max_helix_segment_dominance: 0.85
-    # Minimum fraction of helical residues required before segment
-    # dominance is checked (avoids triggering on noisy low-helix frames).
-    helix_content_threshold: 0.30
-    # Require the condition to hold this many consecutive checks before
-    # aborting (guards against transient misfires at high noise).
-    n_consecutive: 2
 
 scaffoldguided:
   scaffoldguided: False
@@ -190,8 +137,7 @@ scaffoldguided:
   sampled_C: 0
   ss_mask: 0
   systematic: False
-  contig_crop: null
-  radial_crop: null
   target_ss: null
   target_adj: null
   mask_loops: True
+  contig_crop: null
